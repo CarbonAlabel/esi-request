@@ -1,0 +1,22 @@
+{
+  "name": "esi-request",
+  "version": "1.0.0",
+  "description": "Zero dependency Node.js library for making requests to EVE Online's ESI API.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "repository": "github:CarbonAlabel/esi-request",
+  "keywords": [
+    "esi",
+    "eve",
+    "eveonline"
+  ],
+  "author": "Carbon Alabel <carbonalabel@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/CarbonAlabel/esi-request/issues"
+  },
+  "homepage": "https://github.com/CarbonAlabel/esi-request#readme",
+  "engines": {
+    "node": ">=11.0.0"
+  }
+}
