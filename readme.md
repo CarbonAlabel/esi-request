@@ -1,3 +1,60 @@
 # esi-request
 
-Zero dependency Node.js library for making requests to EVE Online's ESI API.
+Zero-dependency Node.js library for making requests to EVE Online's ESI API.
+
+## Features
+
+* Simple promise-based interface.
+* Utilizes HTTP/2 and request compression to make the most efficient use of your bandwidth.
+* Automatic pagination of requests.
+* Simple ETag usage.
+
+## Not Included
+
+* Caching.
+
+## Usage
+
+Node.js 11.0.0 or newer is required. Import the class, and create a new instance of it.
+
+```js
+const ESIRequest = require("esi-request");
+let ESI = new ESIRequest();
+```
+
+Optionally, an options object can be passed to the constructor. Available options are:
+
+* `esi_url`: URL of the ESI the instance should connect to. Defaults to https://esi.evetech.net.
+* `http2_options`: An options object to be passed to the Node http2 library. See the [Node.js documentation](https://nodejs.org/api/http2.html#http2_http2_connect_authority_options_listener) for details.
+* `default_headers`: HTTP headers to be added to all requests.
+* `default_query`: Query parameters to be added to all requests.
+* `max_time`: Maximum amount of time to spend retrying a single request, in milliseconds. Defaults to 30 seconds.
+* `max_retries`: Maximum number of times to retry a single request. Defaults to 3.
+* `retry_delay`: A function which returns a number producing iterable, telling the instance how long to wait before request retries. Defaults to fixed delays of 3, 10, and 15 seconds.
+* `strip_headers`: Array of header names which should be stripped from responses. Defaults to a list of CORS and STS headers which are irrelevant outside of a browser context.
+
+Once the instance is ready, use the `request` method, preferably in an async context, to make requests to ESI.
+
+```js
+let status = await ESI.request("/v1/status/");
+console.log(`There are currently ${status.data.players} players online.`);
+```
+
+In addition to the request path, an options object can be passed. Available options are:
+
+* `method`: HTTP method to use for the request.
+* `headers`: HTTP headers to be added to the request.
+* `query`: Query parameters to be added to the request.
+* `body`: Object to be sent as request body. 
+* `body_page_size`: Used to split the request body into multiple parts.
+* `token`: SSO token to be used in the request.
+* `previous_response`: A response object object returned by a previous request.
+
+The promise should resolve to a response object:
+
+* `headers`: Response headers.
+* `data`: Parsed response body.
+* `body`: Response body, present instead of `data` if the response wasn't a JSON document.
+* `responses`: If pagination was performed, this will be an array containing the individual responses.
+
+If the promise is rejected, the error may come with a `responses` property, which will be an array of response objects from requests made before giving up.
