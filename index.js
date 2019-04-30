@@ -101,7 +101,7 @@ class ESIRequest {
                 stream.on("end", () => {
                     if (chunks.length) {
                         let body = Buffer.concat(chunks).toString();
-                        if (headers["content-encoding"] && headers["content-type"].includes("application/json")) {
+                        if (headers["content-type"] && headers["content-type"].includes("application/json")) {
                             try {
                                 let data = JSON.parse(body);
                                 resolve({headers, data});
