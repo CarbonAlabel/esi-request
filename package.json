@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/CarbonAlabel/esi-request#readme",
   "engines": {
-    "node": ">=11.0.0"
+    "node": ">=11.14.0"
   },
   "files": [
     "index.js",

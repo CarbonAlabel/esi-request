@@ -15,7 +15,7 @@ Zero-dependency Node.js library for making requests to EVE Online's ESI API.
 
 ## Usage
 
-Node.js 11.0.0 or newer is required. Import the class, and create a new instance of it.
+Node.js 11.14.0 or newer is required. Import the class, and create a new instance of it.
 
 ```js
 const ESIRequest = require("esi-request");
