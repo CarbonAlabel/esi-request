@@ -24,6 +24,7 @@ interface ESIRequestOptions {
 }
 
 interface ESIRequestResponse {
+    status?: number;
     headers?: IncomingHttpHeaders;
     body?: string;
     data?: any;

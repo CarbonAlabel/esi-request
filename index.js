@@ -76,16 +76,17 @@ class ESIRequest {
         if (body) {
             request_body = JSON.stringify(body);
         }
-        
+
         // Start the request by sending the headers, send the body if there is one, and end it.
         let request = this.session.request(request_headers);
         if (request_body) {
             request.write(request_body);
         }
         request.end();
-        
+
         // Wait for the response headers.
         let [response_headers] = await once(request, "response");
+        let status = response_headers[":status"];
         // Strip irrelevant header fields.
         for (let header of this.strip_headers) {
             delete response_headers[header];
@@ -109,27 +110,27 @@ class ESIRequest {
             chunks.push(chunk);
         }
         let response_body = Buffer.concat(chunks).toString();
-        
+
         // Process the response.
         if (response_body) {
             if (response_headers["content-type"] && response_headers["content-type"].includes("application/json")) {
                 try {
                     let data = JSON.parse(response_body);
-                    return {headers: response_headers, data};
+                    return {status, headers: response_headers, data};
                 }
                 catch (error) {
-                    error.response = {headers: response_headers, body: response_body};
+                    error.response = {status, headers: response_headers, body: response_body};
                     throw error;
                 }
             } else {
                 let error = new Error("Response wasn't JSON");
-                error.response = {headers: response_headers, body: response_body};
+                error.response = {status, headers: response_headers, body: response_body};
                 throw error;
             }
-        } else if (headers[":status"] === 304) {
-            return {headers: response_headers, data: previous_response.data};
+        } else if (status === 304) {
+            return {status, headers: response_headers, data: previous_response.data};
         } else {
-            return {headers: response_headers};
+            return {status, headers: response_headers};
         }
     }
 
@@ -140,7 +141,7 @@ class ESIRequest {
         let responses = [];
         while (attempts > 0 && time_limit > Date.now()) {
             let response = await this._make_request(path, options);
-            let status = response.headers[":status"];
+            let {status} = response;
             responses.push(response);
             attempts--;
             if (status >= 200 && status <= 299 || status === 304) {
