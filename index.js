@@ -205,7 +205,7 @@ class ESIRequest {
         };
     }
 
-    async request(path, options = {}) {
+    request(path, options = {}) {
         let {method, body, body_page_size} = options;
         // By default, perform a GET request with pagination.
         if ((method || "GET") === "GET") {
