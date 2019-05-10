@@ -48,7 +48,7 @@ class ESIRequest {
 
     // Make a request over the active HTTP/2 session.
     // Also handle JSON encoding/decoding of the request/response bodies.
-    async _http2_request(path, options) {
+    async _make_request(path, options) {
         let {method, headers, query, body, token, previous_response, timing_label} = options;
         let query_string = new URLSearchParams({
             ...this.default_query,
@@ -137,7 +137,7 @@ class ESIRequest {
         let delay_iterator = this.retry_delay()[Symbol.iterator]();
         let responses = [];
         while (attempts > 0 && time_limit > Date.now()) {
-            let response = await this._http2_request(path, options);
+            let response = await this._make_request(path, options);
             let status = response.headers[":status"];
             responses.push(response);
             attempts--;
