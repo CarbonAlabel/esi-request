@@ -122,7 +122,9 @@ class ESIRequest {
                     throw error;
                 }
             } else {
-                return {headers: response_headers, body: response_body};
+                let error = new Error("Response wasn't JSON");
+                error.response = {headers: response_headers, body: response_body};
+                throw error;
             }
         } else if (headers[":status"] === 304) {
             return {headers: response_headers, data: previous_response.data};
