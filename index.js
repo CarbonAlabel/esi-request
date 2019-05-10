@@ -2,6 +2,8 @@
 
 const http2 = require("http2");
 const zlib = require("zlib");
+const {once} = require("events");
+const {pipeline} = require("stream");
 
 const timeout = time => new Promise(resolve => setTimeout(resolve, time));
 
@@ -69,58 +71,64 @@ class ESIRequest {
         if (previous_response && previous_response.headers && previous_response.headers["etag"]) {
             request_headers["if-none-match"] = previous_response.headers["etag"];
         }
-        let json = JSON.stringify(body);
-        return new Promise((resolve, reject) => {
-            // Send request.
-            let request = this.session.request(request_headers);
-            if (body) {
-                request.write(json);
-            }
-            request.end();
+        // Encode the request body as JSON.
+        let request_body;
+        if (body) {
+            request_body = JSON.stringify(body);
+        }
+        
+        // Start the request by sending the headers, send the body if there is one, and end it.
+        let request = this.session.request(request_headers);
+        if (request_body) {
+            request.write(request_body);
+        }
+        request.end();
+        
+        // Wait for the response headers.
+        let [response_headers] = await once(request, "response");
+        // Strip irrelevant header fields.
+        for (let header of this.strip_headers) {
+            delete response_headers[header];
+        }
 
-            // Process response.
-            request.on("error", reject);
-            request.on("response", headers => {
-                // Strip irrelevant header fields.
-                for (let header of this.strip_headers) {
-                    delete headers[header];
+        // If the response is compressed, decompress it.
+        let stream = request;
+        if (["gzip", "deflate", "br"].includes(response_headers["content-encoding"])) {
+            let decompress = {
+                "gzip": zlib.createGunzip,
+                "deflate": zlib.createInflate,
+                "br": zlib.createBrotliDecompress
+            }[response_headers["content-encoding"]]();
+            stream = decompress;
+            pipeline(request, decompress, () => {});
+        }
+
+        // Read the response body.
+        let chunks = [];
+        for await (let chunk of stream) {
+            chunks.push(chunk);
+        }
+        let response_body = Buffer.concat(chunks).toString();
+        
+        // Process the response.
+        if (response_body) {
+            if (response_headers["content-type"] && response_headers["content-type"].includes("application/json")) {
+                try {
+                    let data = JSON.parse(response_body);
+                    return {headers: response_headers, data};
                 }
-                let stream = request, chunks = [];
-                // If the response is compressed, decompress it.
-                if (["gzip", "deflate", "br"].includes(headers["content-encoding"])) {
-                    stream = request.pipe({
-                        "gzip": zlib.createGunzip,
-                        "deflate": zlib.createInflate,
-                        "br": zlib.createBrotliDecompress
-                    }[headers["content-encoding"]]());
-                    stream.on("error", reject);
+                catch (error) {
+                    error.response = {headers: response_headers, body: response_body};
+                    throw error;
                 }
-                stream.on("data", chunk => {
-                    chunks.push(chunk);
-                });
-                stream.on("end", () => {
-                    if (chunks.length) {
-                        let body = Buffer.concat(chunks).toString();
-                        if (headers["content-type"] && headers["content-type"].includes("application/json")) {
-                            try {
-                                let data = JSON.parse(body);
-                                resolve({headers, data});
-                            }
-                            catch (error) {
-                                error.response = {headers, body};
-                                reject(error);
-                            }
-                        } else {
-                            resolve({headers, body});
-                        }
-                    } else if (headers[":status"] === 304) {
-                        resolve({headers, data: previous_response.data});
-                    } else {
-                        resolve({headers});
-                    }
-                });
-            });
-        });
+            } else {
+                return {headers: response_headers, body: response_body};
+            }
+        } else if (headers[":status"] === 304) {
+            return {headers: response_headers, data: previous_response.data};
+        } else {
+            return {headers: response_headers};
+        }
     }
 
     // Make a request, retrying if an error likely to be temporary occurs.
