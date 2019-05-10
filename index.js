@@ -49,7 +49,7 @@ class ESIRequest {
     // Make a request over the active HTTP/2 session.
     // Also handle JSON encoding/decoding of the request/response bodies.
     async _make_request(path, options) {
-        let {method, headers, query, body, token, previous_response, timing_label} = options;
+        let {method, headers, query, body, token, previous_response} = options;
         let query_string = new URLSearchParams({
             ...this.default_query,
             ...query
