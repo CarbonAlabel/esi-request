@@ -5,10 +5,30 @@ const zlib = require("zlib");
 const {once} = require("events");
 const {pipeline} = require("stream");
 
+import {ClientHttp2Session, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
+
+interface ESIRequestOptions {
+    method?: "GET" | "POST" | "PUT" | "DELETE";
+    headers?: OutgoingHttpHeaders;
+    query?: object;
+    body?: any;
+    body_page_size?: number;
+    token?: string | Promise<string> | (() => string | Promise<string>);
+    previous_response?: ESIResponse;
+}
+
+interface ESIResponse {
+    status?: number;
+    headers?: IncomingHttpHeaders;
+    body?: string;
+    data?: any;
+    responses?: ESIResponse[];
+}
+
 const timeout = time => new Promise(resolve => setTimeout(resolve, time));
 
 // Finds the common headers from an array of response objects.
-function common_headers(responses) {
+function common_headers(responses: ESIResponse[]): IncomingHttpHeaders {
     // Clone the first response's headers.
     let common = Object.assign({}, responses[0].headers);
     // Iterate through the remaining responses.
@@ -24,6 +44,16 @@ function common_headers(responses) {
 }
 
 class ESIRequest {
+    session: ClientHttp2Session;
+    esi_url: string;
+    http2_options: SecureClientSessionOptions;
+    default_headers: object;
+    default_query: object;
+    max_time: number;
+    max_retries: number;
+    retry_delay: () => Iterable<number>;
+    page_split_delay: (pages: number) => number;
+    strip_headers: string[];
     constructor({
         esi_url = "https://esi.evetech.net",
         http2_options = {},
@@ -42,7 +72,7 @@ class ESIRequest {
             "access-control-max-age",
             "strict-transport-security"
         ]
-    } = {}) {
+    }: Partial<ESIRequest> = {}) {
         this.esi_url = esi_url;
         this.http2_options = http2_options;
         this.default_headers = default_headers;
@@ -55,7 +85,7 @@ class ESIRequest {
         this.http2_connect();
     }
 
-    http2_connect() {
+    http2_connect(): void {
         this.session = http2.connect(this.esi_url, this.http2_options);
         // When many requests are initiated before the session has finished connecting, a warning will be emitted:
         // MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 connect listeners added. Use emitter.setMaxListeners() to increase limit
@@ -66,7 +96,7 @@ class ESIRequest {
 
     // Make a request over the active HTTP/2 session.
     // Also handle JSON encoding/decoding of the request/response bodies.
-    async _make_request(path, options) {
+    private async _make_request(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let {method, headers, query, body, token, previous_response} = options;
         let query_string = new URLSearchParams({
             ...this.default_query,
@@ -141,7 +171,7 @@ class ESIRequest {
                     throw error;
                 }
             } else {
-                let error = new Error("Response wasn't JSON");
+                let error: any = new Error("Response wasn't JSON");
                 error.response = {status, headers: response_headers, body: response_body};
                 throw error;
             }
@@ -154,7 +184,7 @@ class ESIRequest {
     }
 
     // Make a request, retrying if an error likely to be temporary occurs.
-    async _retry_request(path, options) {
+    private async _retry_request(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let attempts = this.max_retries + 1, time_limit = Date.now() + this.max_time;
         let delay_iterator = this.retry_delay()[Symbol.iterator]();
         let responses = [];
@@ -185,7 +215,7 @@ class ESIRequest {
 
     // Make a GET request, requesting all pages and merging them if the response is spread over multiple pages.
     // Will not work if the endpoint does not use the ESI X-Pages pagination style.
-    async _paginate_get(path, options) {
+    private async _paginate_get(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let {previous_response} = options, previous_responses = [];
         if (previous_response) {
             previous_responses = previous_response.responses || [previous_response];
@@ -216,7 +246,7 @@ class ESIRequest {
             let headers = common_headers(responses);
             // The expires header not being in the common headers is indication of a page split, an error should be thrown.
             if (!headers["expires"]) {
-                let error = new Error("Page split detected");
+                let error: any = new Error("Page split detected");
                 error.responses = responses;
                 throw error;
             }
@@ -230,7 +260,7 @@ class ESIRequest {
 
     // Make a POST request, splitting the request body into multiple pages.
     // Will only work if both the request and response bodies are arrays.
-    async _paginate_post(path, options) {
+    private async _paginate_post(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let {body, body_page_size} = options;
         let body_chunks = [], body_copy = Array.from(body);
         while (body_copy.length) {
@@ -243,7 +273,7 @@ class ESIRequest {
         return {status, headers, data, responses};
     }
 
-    request(path, options = {}) {
+    request(path: string, options: ESIRequestOptions = {}): Promise<ESIResponse> {
         let {method, body, body_page_size} = options;
         // By default, perform a GET request with pagination.
         if ((method || "GET") === "GET") {
@@ -260,4 +290,4 @@ class ESIRequest {
     }
 }
 
-module.exports = ESIRequest;
+export = ESIRequest;
