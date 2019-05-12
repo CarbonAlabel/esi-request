@@ -7,6 +7,22 @@ const {pipeline} = require("stream");
 
 const timeout = time => new Promise(resolve => setTimeout(resolve, time));
 
+// Finds the common headers from an array of response objects.
+function common_headers(responses) {
+    // Clone the first response's headers.
+    let common = Object.assign({}, responses[0].headers);
+    // Iterate through the remaining responses.
+    for (let response of responses.slice(1)) {
+        // If the header values don't match, delete the header.
+        for (let header in common) {
+            if (common[header] !== response.headers[header]) {
+                delete common[header];
+            }
+        }
+    }
+    return common;
+}
+
 class ESIRequest {
     constructor({
         esi_url = "https://esi.evetech.net",
@@ -183,10 +199,10 @@ class ESIRequest {
                 previous_response: previous_responses[page - 1]
             })));
             let responses = [first_page, ...other_pages];
-            return {
-                data: responses.map(response => response.data).flat(),
-                responses
-            };
+            let headers = common_headers(responses);
+            let status = first_page.status;
+            let data = responses.map(response => response.data).flat();
+            return {status, headers, data, responses};
         } else {
             return first_page;
         }
@@ -201,10 +217,10 @@ class ESIRequest {
             body_chunks.push(body_copy.splice(0, body_page_size));
         }
         let responses = await Promise.all(body_chunks.map(body_chunk => this._retry_request(path, {...options, body: body_chunk})));
-        return {
-            data: responses.map(response => response.data).flat(),
-            responses
-        };
+        let headers = common_headers(responses);
+        let status = responses[0].status;
+        let data = responses.map(response => response.data).flat();
+        return {status, headers, data, responses};
     }
 
     request(path, options = {}) {
