@@ -32,6 +32,7 @@ class ESIRequest {
         max_time = 30000,
         max_retries = 3,
         retry_delay = () => [3000, 10000, 15000],
+        page_split_delay = pages => pages * 75 + 2500,
         strip_headers = [
             "access-control-allow-credentials",
             "access-control-allow-headers",
@@ -49,6 +50,7 @@ class ESIRequest {
         this.max_time = max_time;
         this.max_retries = max_retries;
         this.retry_delay = retry_delay;
+        this.page_split_delay = page_split_delay;
         this.strip_headers = strip_headers;
         this.http2_connect();
     }
@@ -190,6 +192,18 @@ class ESIRequest {
         }
         let first_page = await this._retry_request(path, {...options, previous_response: previous_responses[0]});
         let pages = Number(first_page.headers["x-pages"]) || 1;
+        // Page split prevention:
+        // If there are multiple pages, and the cache for the endpoint will expire soon, wait for it to expire and repeat the request.
+        // This measure, while significantly decreasing it, does not completely eliminate the possibility of a page split occurring.
+        if (pages > 1) {
+            let expires_in = Date.parse(first_page.headers["expires"]) - Date.parse(first_page.headers["date"]) + 1000;
+            let calculated_delay = this.page_split_delay(pages);
+            if (expires_in < calculated_delay) {
+                await timeout(expires_in);
+                first_page = await this._retry_request(path, {...options, previous_response: previous_responses[0]});
+                pages = Number(first_page.headers["x-pages"]) || 1;
+            }
+        }
         // Request additional pages, if there are any.
         if (pages > 1) {
             let page_numbers = new Array(pages - 1).fill(undefined).map((_, i) => i + 2);
@@ -200,6 +214,12 @@ class ESIRequest {
             })));
             let responses = [first_page, ...other_pages];
             let headers = common_headers(responses);
+            // The expires header not being in the common headers is indication of a page split, an error should be thrown.
+            if (!headers["expires"]) {
+                let error = new Error("Page split detected");
+                error.responses = responses;
+                throw error;
+            }
             let status = first_page.status;
             let data = responses.map(response => response.data).flat();
             return {status, headers, data, responses};

@@ -10,6 +10,7 @@ interface ESIRequestProperties {
     max_time: number;
     max_retries: number;
     retry_delay: () => Iterable<number>;
+    page_split_delay: (pages: number) => number;
     strip_headers: string[];
 }
 
