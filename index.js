@@ -128,6 +128,7 @@ class ESIRequest {
                 throw error;
             }
         } else if (status === 304) {
+            status = previous_response.status;
             return {status, headers: response_headers, data: previous_response.data};
         } else {
             return {status, headers: response_headers};
