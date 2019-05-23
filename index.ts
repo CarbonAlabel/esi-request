@@ -5,7 +5,7 @@ const zlib = require("zlib");
 const {once} = require("events");
 const {pipeline} = require("stream");
 
-import {ClientHttp2Session, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
+import {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
 
 interface ESIRequestOptions {
     method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -43,10 +43,155 @@ function common_headers(responses: ESIResponse[]): IncomingHttpHeaders {
     return common;
 }
 
-class ESIRequest {
+type PendingRequest = {
+    headers: OutgoingHttpHeaders,
+    timestamp: number,
+    resolve_function: (request: ClientHttp2Stream) => void,
+    reject_function: (error: Error) => void
+};
+
+type ESISessionConfig = Pick<ESISession, "esi_url" | "http2_options" | "reconnect_delay" | "max_pending_time">
+
+// Basic HTTP/2 session wrapper.
+// Reconnects if the connection is broken, and queues requests until a HTTP/2 session is available.
+class ESISession {
     session: ClientHttp2Session;
+    request_queue: PendingRequest[] = [];
+    closed: boolean = false;
     esi_url: string;
     http2_options: SecureClientSessionOptions;
+    reconnect_delay: () => Iterable<number>;
+    max_pending_time: number;
+    constructor({
+        esi_url = "https://esi.evetech.net",
+        http2_options = {},
+        reconnect_delay = function* () {
+            let base_delay = 500, multiplier = 1, max_multiplier = 64;
+            while (true) {
+                yield base_delay * multiplier * (0.75 + Math.random() / 2);
+                multiplier = Math.min(max_multiplier, multiplier * 2);
+            }
+        },
+        max_pending_time = 30000
+    }: Partial<ESISessionConfig> = {}) {
+        Object.assign(this, {
+            esi_url,
+            http2_options,
+            reconnect_delay,
+            max_pending_time
+        });
+        this.reconnect();
+    }
+
+    // Send pending requests from the request queue.
+    private send_pending() {
+        for (let pending of this.request_queue) {
+            pending.resolve_function(this.session.request(pending.headers));
+        }
+    }
+
+    // Reject pending requests that have been in the request queue for too long.
+    private reject_old() {
+        // Find the index of the first request that isn't too old.
+        let index = this.request_queue.findIndex((request) => Date.now() - request.timestamp < this.max_pending_time);
+        if (index === 0) {
+            // None of the requests are too old, no further action is required.
+            return;
+        }
+        if (index === -1) {
+            // All of the requests are too old.
+            index = this.request_queue.length;
+        }
+        // Reject all the old requests.
+        for (let request of this.request_queue.slice(0, index)) {
+            request.reject_function(new Error("Waited too long for a connection"));
+        }
+        // Leave the remaining requests in the queue.
+        this.request_queue = this.request_queue.slice(index);
+    }
+
+    // Repeatedly try to reconnect.
+    // Also used for making the initial connection.
+    private async reconnect() {
+        let delay_iterator = this.reconnect_delay()[Symbol.iterator]();
+        while (true) {
+            // Stop trying to reconnect if the session was explicity closed. 
+            if (this.closed) return;
+            try {
+                let session = new http2.connect(this.esi_url, this.http2_options);
+                // Will throw if an error occurs before the connection is established.
+                await once(session, "connect");
+                // Register event listeners, and start using the session.
+                this.session = session;
+                this.session.on("error", () => {});
+                this.session.on("close", () => {
+                    this.reconnect();
+                });
+                // Send any pending requests.
+                this.send_pending();
+                return;
+            } catch {
+                // A reconnection attempt just failed, this is a good time to reject requests that have been waiting too long.
+                this.reject_old();
+                let delay = delay_iterator.next();
+                await timeout(delay.value);
+            }
+        }
+    }
+
+    request(headers: OutgoingHttpHeaders): ClientHttp2Stream | Promise<ClientHttp2Stream> {
+        if (!this.session || this.session.connecting || this.session.closed || this.session.destroyed) {
+            let resolve_function, reject_function;
+            let promise: Promise<ClientHttp2Stream> = new Promise((resolve, reject) => {
+                resolve_function = resolve;
+                reject_function = reject;
+            });
+            this.request_queue.push({headers, timestamp: Date.now(), resolve_function, reject_function});
+            return promise;
+        } else {
+            return this.session.request(headers);
+        }
+    }
+
+    close() {
+        this.closed = true;
+        if (this.session) {
+            this.session.close();
+        }
+    }
+}
+
+type ESISessionPoolConfig = ESISessionConfig & Pick<ESISessionPool, "size">;
+
+// Advanced HTTP/2 session wrapper.
+// Spreads requests over multiple HTTP/2 sessions.
+class ESISessionPool {
+    sessions: ESISession[];
+    index: number = 0;
+    size: number;
+
+    constructor(options: Partial<ESISessionPoolConfig> = {}) {
+        let size = options.size || 2;
+        this.size = size;
+        this.sessions = new Array(size).fill(undefined).map(() => new ESISession(options));
+    }
+
+    request(headers: OutgoingHttpHeaders) {
+        return this.sessions[this.index++ % this.size].request(headers);
+    }
+
+    close() {
+        for (let session of this.sessions) {
+            session.close();
+        }
+    }
+}
+
+class ESIRequest {
+    session: ESISession | ESISessionPool;
+    esi_url: string;
+    http2_options: SecureClientSessionOptions;
+    pool_size: number;
     default_headers: object;
     default_query: object;
     max_time: number;
@@ -57,6 +202,7 @@ class ESIRequest {
     constructor({
         esi_url = "https://esi.evetech.net",
         http2_options = {},
+        pool_size = 1,
         default_headers = {},
         default_query = {},
         max_time = 30000,
@@ -73,8 +219,18 @@ class ESIRequest {
             "strict-transport-security"
         ]
     }: Partial<ESIRequest> = {}) {
-        this.esi_url = esi_url;
-        this.http2_options = http2_options;
+        if (pool_size > 1) {
+            this.session = new ESISessionPool({
+                size: pool_size,
+                esi_url,
+                http2_options
+            });
+        } else {
+            this.session = new ESISession({
+                esi_url,
+                http2_options
+            });
+        }
         this.default_headers = default_headers;
         this.default_query = default_query;
         this.max_time = max_time;
@@ -82,16 +238,6 @@ class ESIRequest {
         this.retry_delay = retry_delay;
         this.page_split_delay = page_split_delay;
         this.strip_headers = strip_headers;
-        this.http2_connect();
-    }
-
-    http2_connect(): void {
-        this.session = http2.connect(this.esi_url, this.http2_options);
-        // When many requests are initiated before the session has finished connecting, a warning will be emitted:
-        // MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 connect listeners added. Use emitter.setMaxListeners() to increase limit
-        // This is probably due to each of the requests registering their own listener on the session's connect event.
-        // For the time being, I'll follow the warning's advice and remove the limit altogether.
-        this.session.setMaxListeners(0);
     }
 
     // Make a request over the active HTTP/2 session.
@@ -126,7 +272,7 @@ class ESIRequest {
         }
 
         // Start the request by sending the headers, send the body if there is one, and end it.
-        let request = this.session.request(request_headers);
+        let request = await this.session.request(request_headers);
         if (request_body) {
             request.write(request_body);
         }
