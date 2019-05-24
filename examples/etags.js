@@ -15,6 +15,4 @@ let ESI = new ESIRequest();
     console.log(second.headers[":status"]);
     // The library will reuse the previous response; both responses will have the same data object.
     return second.data === first.data;
-})().then(console.log, console.error).finally(() => {
-    ESI.session.close();
-});
+})().then(console.log, console.error).finally(ESI.close);

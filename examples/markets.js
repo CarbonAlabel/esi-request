@@ -17,6 +17,4 @@ let ESI = new ESIRequest({
     let market_orders = markets.map(response => response.data).flat();
     // Just return how many of them there are in total.
     return market_orders.length;
-})().then(console.log, console.error).finally(() => {
-    ESI.session.close();
-});
+})().then(console.log, console.error).finally(ESI.close);

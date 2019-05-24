@@ -21,7 +21,4 @@ let timeout = time => new Promise(resolve => setTimeout(resolve, time));
         // Wait for the cache on the endpoint to expire before making the request again.
         await timeout(Date.parse(status.headers["expires"]) - Date.parse(status.headers["date"]) + 500);
     }
-})().catch(error => {
-    console.error(error);
-    ESI.session.close();
-});
+})().catch(console.error).finally(ESI.close);

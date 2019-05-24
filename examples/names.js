@@ -16,6 +16,4 @@ let ESI = new ESIRequest();
     // Find the entry for type Carbon and return its ID.
     let carbon = names.data.find(type => type.name === "Carbon");
     return carbon.id;
-})().then(console.log, console.error).finally(() => {
-    ESI.session.close();
-});
+})().then(console.log, console.error).finally(ESI.close);

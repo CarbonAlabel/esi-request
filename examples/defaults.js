@@ -17,6 +17,4 @@ let ESI = new ESIRequest({
     let amarr = factions.data.find(faction => faction.faction_id === 500003);
     // Return the description for the Amarr Empire (in German).
     return amarr.description;
-})().then(console.log, console.error).finally(() => {
-    ESI.session.close();
-});
+})().then(console.log, console.error).finally(ESI.close);
