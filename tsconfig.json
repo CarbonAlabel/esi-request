@@ -8,7 +8,8 @@
         "module": "commonjs",
         "declaration": true,
         "sourceMap": true,
-        "removeComments": true
+        "removeComments": true,
+        "incremental": true
     },
     "files": [
         "index.ts"
