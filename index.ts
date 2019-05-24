@@ -434,6 +434,10 @@ class ESIRequest {
             return this._retry_request(path, options);
         }
     }
+
+    get close() {
+        return this.session.close.bind(this.session);
+    }
 }
 
 export = ESIRequest;
