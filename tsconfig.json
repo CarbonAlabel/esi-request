@@ -6,7 +6,9 @@
             "dom"
         ],
         "module": "commonjs",
-        "declaration": true
+        "declaration": true,
+        "sourceMap": true,
+        "removeComments": true
     },
     "files": [
         "index.ts"

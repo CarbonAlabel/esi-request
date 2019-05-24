@@ -3,5 +3,5 @@ node_modules/
 package-lock.json
 
 # Compiled files
-index.js
-index.d.ts
+index.*
+!index.ts
