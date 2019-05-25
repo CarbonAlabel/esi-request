@@ -132,8 +132,6 @@ class ESIConnection implements ESIConnectionWrapper {
     }
 }
 
-type ESIConnectionPoolSettings = ESIConnectionSettings & Pick<ESIConnectionPool, "size">;
-
 // Advanced HTTP/2 session wrapper.
 // Spreads requests over multiple HTTP/2 sessions.
 class ESIConnectionPool implements ESIConnectionWrapper {
@@ -141,8 +139,7 @@ class ESIConnectionPool implements ESIConnectionWrapper {
     index: number = 0;
     size: number;
 
-    constructor(settings: Partial<ESIConnectionPoolSettings> = {}) {
-        let size = settings.size || 2;
+    constructor(size: number, settings: Partial<ESIConnectionSettings> = {}) {
         this.size = size;
         this.sessions = new Array(size).fill(undefined).map(() => new ESIConnection(settings));
     }
@@ -209,8 +206,7 @@ class ESIRequest {
         ]
     }: Partial<ESIRequest> = {}) {
         if (pool_size > 1) {
-            this.connection = new ESIConnectionPool({
-                size: pool_size,
+            this.connection = new ESIConnectionPool(pool_size, {
                 esi_url,
                 http2_options
             });
