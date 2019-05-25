@@ -50,11 +50,11 @@ type PendingRequest = {
     reject_function: (error: Error) => void
 };
 
-type ESISessionConfig = Pick<ESISession, "esi_url" | "http2_options" | "reconnect_delay" | "max_pending_time">
+type ESIConnectionSettings = Pick<ESIConnection, "esi_url" | "http2_options" | "reconnect_delay" | "max_pending_time">
 
 // Basic HTTP/2 session wrapper.
 // Reconnects if the connection is broken, and queues requests until a HTTP/2 session is available.
-class ESISession {
+class ESIConnection {
     session: ClientHttp2Session;
     request_queue: PendingRequest[] = [];
     closed: boolean = false;
@@ -73,7 +73,7 @@ class ESISession {
             }
         },
         max_pending_time = 30000
-    }: Partial<ESISessionConfig> = {}) {
+    }: Partial<ESIConnectionSettings> = {}) {
         Object.assign(this, {
             esi_url,
             http2_options,
@@ -161,19 +161,19 @@ class ESISession {
     }
 }
 
-type ESISessionPoolConfig = ESISessionConfig & Pick<ESISessionPool, "size">;
+type ESIConnectionPoolSettings = ESIConnectionSettings & Pick<ESIConnectionPool, "size">;
 
 // Advanced HTTP/2 session wrapper.
 // Spreads requests over multiple HTTP/2 sessions.
-class ESISessionPool {
-    sessions: ESISession[];
+class ESIConnectionPool {
+    sessions: ESIConnection[];
     index: number = 0;
     size: number;
 
-    constructor(options: Partial<ESISessionPoolConfig> = {}) {
-        let size = options.size || 2;
+    constructor(settings: Partial<ESIConnectionPoolSettings> = {}) {
+        let size = settings.size || 2;
         this.size = size;
-        this.sessions = new Array(size).fill(undefined).map(() => new ESISession(options));
+        this.sessions = new Array(size).fill(undefined).map(() => new ESIConnection(settings));
     }
 
     request(headers: OutgoingHttpHeaders) {
@@ -188,7 +188,7 @@ class ESISessionPool {
 }
 
 class ESIRequest {
-    session: ESISession | ESISessionPool;
+    connection: ESIConnection | ESIConnectionPool;
     esi_url: string;
     http2_options: SecureClientSessionOptions;
     pool_size: number;
@@ -220,13 +220,13 @@ class ESIRequest {
         ]
     }: Partial<ESIRequest> = {}) {
         if (pool_size > 1) {
-            this.session = new ESISessionPool({
+            this.connection = new ESIConnectionPool({
                 size: pool_size,
                 esi_url,
                 http2_options
             });
         } else {
-            this.session = new ESISession({
+            this.connection = new ESIConnection({
                 esi_url,
                 http2_options
             });
@@ -240,7 +240,7 @@ class ESIRequest {
         this.strip_headers = strip_headers;
     }
 
-    // Make a request over the active HTTP/2 session.
+    // Make a request over the active connection.
     // Also handle JSON encoding/decoding of the request/response bodies.
     private async _make_request(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let {method, headers, query, body, token, previous_response} = options;
@@ -272,7 +272,7 @@ class ESIRequest {
         }
 
         // Start the request by sending the headers, send the body if there is one, and end it.
-        let request = await this.session.request(request_headers);
+        let request = await this.connection.request(request_headers);
         if (request_body) {
             request.write(request_body);
         }
@@ -436,7 +436,7 @@ class ESIRequest {
     }
 
     get close() {
-        return this.session.close.bind(this.session);
+        return this.connection.close.bind(this.connection);
     }
 }
 
