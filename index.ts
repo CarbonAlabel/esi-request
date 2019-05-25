@@ -43,6 +43,11 @@ function common_headers(responses: ESIResponse[]): IncomingHttpHeaders {
     return common;
 }
 
+interface ESIConnectionWrapper {
+    request(headers: OutgoingHttpHeaders): ClientHttp2Stream | Promise<ClientHttp2Stream>;
+    close(): void;
+}
+
 type PendingRequest = {
     headers: OutgoingHttpHeaders,
     timestamp: number,
@@ -54,7 +59,7 @@ type ESIConnectionSettings = Pick<ESIConnection, "esi_url" | "http2_options" | "
 
 // Basic HTTP/2 session wrapper.
 // Reconnects if the connection is broken, and queues requests until a HTTP/2 session is available.
-class ESIConnection {
+class ESIConnection implements ESIConnectionWrapper {
     session: ClientHttp2Session;
     request_queue: PendingRequest[] = [];
     closed: boolean = false;
@@ -165,7 +170,7 @@ type ESIConnectionPoolSettings = ESIConnectionSettings & Pick<ESIConnectionPool,
 
 // Advanced HTTP/2 session wrapper.
 // Spreads requests over multiple HTTP/2 sessions.
-class ESIConnectionPool {
+class ESIConnectionPool implements ESIConnectionWrapper {
     sessions: ESIConnection[];
     index: number = 0;
     size: number;
@@ -188,7 +193,7 @@ class ESIConnectionPool {
 }
 
 class ESIRequest {
-    connection: ESIConnection | ESIConnectionPool;
+    connection: ESIConnectionWrapper;
     esi_url: string;
     http2_options: SecureClientSessionOptions;
     pool_size: number;
