@@ -7,24 +7,6 @@ const {pipeline} = require("stream");
 
 import {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
 
-interface ESIRequestOptions {
-    method?: "GET" | "POST" | "PUT" | "DELETE";
-    headers?: OutgoingHttpHeaders;
-    query?: object;
-    body?: any;
-    body_page_size?: number;
-    token?: string | Promise<string> | (() => string | Promise<string>);
-    previous_response?: ESIResponse;
-}
-
-interface ESIResponse {
-    status?: number;
-    headers?: IncomingHttpHeaders;
-    body?: string;
-    data?: any;
-    responses?: ESIResponse[];
-}
-
 const timeout = time => new Promise(resolve => setTimeout(resolve, time));
 
 // Finds the common headers from an array of response objects.
@@ -190,6 +172,24 @@ class ESIConnectionPool implements ESIConnectionWrapper {
             session.close();
         }
     }
+}
+
+type ESIRequestOptions = Partial<{
+    method: "GET" | "POST" | "PUT" | "DELETE";
+    headers: OutgoingHttpHeaders;
+    query: object;
+    body: any;
+    body_page_size: number;
+    token: string | Promise<string> | (() => string | Promise<string>);
+    previous_response: ESIResponse;
+}>
+
+type ESIResponse = {
+    status: number;
+    headers: IncomingHttpHeaders;
+    body?: string;
+    data?: any;
+    responses?: ESIResponse[];
 }
 
 class ESIRequest {
