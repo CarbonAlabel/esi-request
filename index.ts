@@ -9,22 +9,6 @@ import {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttp
 
 const timeout = time => new Promise(resolve => setTimeout(resolve, time));
 
-// Finds the common headers from an array of response objects.
-function common_headers(responses: ESIResponse[]): IncomingHttpHeaders {
-    // Clone the first response's headers.
-    let common = Object.assign({}, responses[0].headers);
-    // Iterate through the remaining responses.
-    for (let response of responses.slice(1)) {
-        // If the header values don't match, delete the header.
-        for (let header in common) {
-            if (common[header] !== response.headers[header]) {
-                delete common[header];
-            }
-        }
-    }
-    return common;
-}
-
 interface ESIConnectionWrapper {
     request(headers: OutgoingHttpHeaders): ClientHttp2Stream | Promise<ClientHttp2Stream>;
     close(): void;
@@ -364,6 +348,22 @@ class ESIRequest {
         throw Object.assign(new Error("Retry limit reached"), {responses});
     }
 
+    // Finds the common headers from an array of response objects.
+    static common_headers(responses: ESIResponse[]): IncomingHttpHeaders {
+        // Clone the first response's headers.
+        let common = Object.assign({}, responses[0].headers);
+        // Iterate through the remaining responses.
+        for (let response of responses.slice(1)) {
+            // If the header values don't match, delete the header.
+            for (let header in common) {
+                if (common[header] !== response.headers[header]) {
+                    delete common[header];
+                }
+            }
+        }
+        return common;
+    }
+
     // Make a GET request, requesting all pages and merging them if the response is spread over multiple pages.
     // Will not work if the endpoint does not use the ESI X-Pages pagination style.
     private async _paginate_get(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
@@ -394,7 +394,7 @@ class ESIRequest {
                 previous_response: previous_responses[page - 1]
             })));
             let responses = [first_page, ...other_pages];
-            let headers = common_headers(responses);
+            let headers = ESIRequest.common_headers(responses);
             // The expires header not being in the common headers is indication of a page split, an error should be thrown.
             if (!headers["expires"]) {
                 let error: any = new Error("Page split detected");
@@ -418,7 +418,7 @@ class ESIRequest {
             body_chunks.push(body_copy.splice(0, body_page_size));
         }
         let responses = await Promise.all(body_chunks.map(body_chunk => this._retry_request(path, {...options, body: body_chunk})));
-        let headers = common_headers(responses);
+        let headers = ESIRequest.common_headers(responses);
         let status = responses[0].status;
         let data = responses.map(response => response.data).flat();
         return {status, headers, data, responses};
