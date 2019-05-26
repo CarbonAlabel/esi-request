@@ -173,11 +173,14 @@ type ESIResponse = {
     responses?: ESIResponse[];
 }
 
+type ESIRequestSettings = {
+    connection: ESIConnectionWrapper;
+    connection_settings: Partial<ESIConnectionSettings>;
+    pool_size: number;
+} & Pick<ESIRequest, "default_headers" | "default_query" | "max_time" | "max_retries" | "retry_delay" | "page_split_delay" | "strip_headers">;
+
 class ESIRequest {
     connection: ESIConnectionWrapper;
-    esi_url: string;
-    http2_options: SecureClientSessionOptions;
-    pool_size: number;
     default_headers: object;
     default_query: object;
     max_time: number;
@@ -186,8 +189,8 @@ class ESIRequest {
     page_split_delay: (pages: number) => number;
     strip_headers: string[];
     constructor({
-        esi_url = "https://esi.evetech.net",
-        http2_options = {},
+        connection,
+        connection_settings = {},
         pool_size = 1,
         default_headers = {},
         default_query = {},
@@ -204,25 +207,24 @@ class ESIRequest {
             "access-control-max-age",
             "strict-transport-security"
         ]
-    }: Partial<ESIRequest> = {}) {
-        if (pool_size > 1) {
-            this.connection = new ESIConnectionPool(pool_size, {
-                esi_url,
-                http2_options
-            });
+    }: Partial<ESIRequestSettings> = {}) {
+        //
+        if (connection) {
+            this.connection = connection;
+        } else if (Number.isInteger(pool_size) && pool_size > 1) {
+            this.connection = new ESIConnectionPool(pool_size, connection_settings);
         } else {
-            this.connection = new ESIConnection({
-                esi_url,
-                http2_options
-            });
+            this.connection = new ESIConnection(connection_settings);
         }
-        this.default_headers = default_headers;
-        this.default_query = default_query;
-        this.max_time = max_time;
-        this.max_retries = max_retries;
-        this.retry_delay = retry_delay;
-        this.page_split_delay = page_split_delay;
-        this.strip_headers = strip_headers;
+        Object.assign(this, {
+            default_headers,
+            default_query,
+            max_time,
+            max_retries,
+            retry_delay,
+            page_split_delay,
+            strip_headers
+        });
     }
 
     // Make a request over the active connection.
