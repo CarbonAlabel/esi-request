@@ -324,8 +324,8 @@ class ESIRequest {
             let {status} = response;
             responses.push(response);
             attempts--;
-            if (status >= 200 && status <= 299 || status === 304) {
-                // 2xx class codes indicate success, and 304 indicates the previous response was reused.
+            if (status >= 200 && status <= 299) {
+                // 2xx class codes indicate success.
                 return response;
             } else if (status >= 502 && status <= 504) {
                 // Codes 502, 503, and 504 indicate temporary errors, the request should be retried after a while.
