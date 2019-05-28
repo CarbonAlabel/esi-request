@@ -304,9 +304,7 @@ class ESIRequest {
                     throw error;
                 }
             } else {
-                let error: any = new Error("Response wasn't JSON");
-                error.response = {status, headers: response_headers, body: response_body};
-                throw error;
+                return {status, headers: response_headers, body: response_body};
             }
         } else if (status === 304) {
             status = previous_response.status;
