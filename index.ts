@@ -158,6 +158,7 @@ class ESIConnectionPool implements ESIConnectionWrapper {
 type ESIRequestOptions = Partial<{
     method: "GET" | "POST" | "PUT" | "DELETE";
     headers: OutgoingHttpHeaders;
+    parameters: object;
     query: object;
     body: any;
     body_page_size: number;
@@ -230,12 +231,23 @@ class ESIRequest {
     // Make a request over the active connection.
     // Also handle JSON encoding/decoding of the request/response bodies.
     private async _make_request(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
-        let {method, headers, query, body, token, previous_response} = options;
+        let {method, headers, parameters, query, body, token, previous_response} = options;
+        let request_path = path;
+        for (let token of path.match(/{\w+}/g) || []) {
+            let name = token.slice(1, -1);
+            if (name in parameters) {
+                request_path = request_path.replace(token, parameters[name]);
+            } else {
+                throw new Error(`Value for URL parameter "${name}" was not provided`);
+            }
+        }
         let query_string = new URLSearchParams({
             ...this.default_query,
             ...query
         }).toString();
-        let request_path = path + (query_string ? "?" + query_string : "");
+        if (query_string) {
+            request_path += "?" + query_string;
+        }
         let request_headers = {
             ...this.default_headers,
             ...headers,
