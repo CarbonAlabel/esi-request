@@ -14,7 +14,9 @@ let ESI = new ESIRequest({
     // Request the list of region IDs.
     let regions = await ESI.request("/v1/universe/regions/");
     // Request the market orders for each of the regions.
+    console.time("markets");
     let markets = await Promise.all(regions.data.map(region_id => ESI.request("/v1/markets/{region_id}/orders/", {parameters: {region_id}})));
+    console.timeEnd("markets");
     // Merge all the orders into a single array.
     let market_orders = markets.map(response => response.data).flat();
     // Just return how many of them there are in total.
