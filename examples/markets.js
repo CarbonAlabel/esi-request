@@ -1,13 +1,10 @@
 const ESIRequest = require("../index.js");
 
 // Getting all the market orders from ESI is a big task, and as done below, will involve making hundreds of concurrent requests to ESI.
-// With the default memory limit of 10, the http2 session would run out of memory.
+// With the default settings, this might take a while, as a single connection can only handle 128 concurrent requests.
+// Using a connection pool gets around this.
 let ESI = new ESIRequest({
-    connection_settings: {
-        http2_options: {
-            maxSessionMemory: 50
-        }
-    }
+    pool_size: 15
 });
 
 (async () => {
