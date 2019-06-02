@@ -350,7 +350,7 @@ class ESIRequest {
             } else if (status >= 502 && status <= 504) {
                 // Codes 502, 503, and 504 indicate temporary errors, the request should be retried after a while.
                 let delay = delay_iterator.next();
-                if (delay.value) {
+                if (delay.value && delay.value < time_limit - Date.now()) {
                     await timeout(delay.value);
                 } else {
                     break;
