@@ -9,6 +9,18 @@ import {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttp
 
 const timeout = time => new Promise(resolve => setTimeout(resolve, time));
 
+// Returns a generator function implementing a form of exponential backoff.
+function exponential_backoff(base_delay: number, max_multiplier: number, multiplier_growth: number = 2) {
+    return function* () {
+        let multiplier = 1;
+        while (true) {
+            // The delay is randomized +/-25% from the mean.
+            yield base_delay * multiplier * (0.75 + Math.random() / 2);
+            multiplier = Math.min(max_multiplier, multiplier * multiplier_growth);
+        }
+    };
+}
+
 interface ESIConnectionWrapper {
     request(headers: OutgoingHttpHeaders): ClientHttp2Stream | Promise<ClientHttp2Stream>;
     close(): void;
@@ -36,13 +48,7 @@ class ESIConnection implements ESIConnectionWrapper {
     constructor({
         esi_url = "https://esi.evetech.net",
         http2_options = {},
-        reconnect_delay = function* () {
-            let base_delay = 500, multiplier = 1, max_multiplier = 64;
-            while (true) {
-                yield base_delay * multiplier * (0.75 + Math.random() / 2);
-                multiplier = Math.min(max_multiplier, multiplier * 2);
-            }
-        },
+        reconnect_delay = exponential_backoff(500, 64),
         max_pending_time = 10000
     }: Partial<ESIConnectionSettings> = {}) {
         Object.assign(this, {
@@ -197,7 +203,7 @@ class ESIRequest {
         default_query = {},
         max_time = 10000,
         max_retries = 3,
-        retry_delay = () => [3000, 10000, 15000],
+        retry_delay = exponential_backoff(500, 30, 3),
         page_split_delay = pages => pages * 75 + 2500,
         strip_headers = [
             "access-control-allow-credentials",
