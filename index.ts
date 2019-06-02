@@ -156,7 +156,7 @@ class ESIConnectionPool implements ESIConnectionWrapper {
 }
 
 type ESIRequestOptions = Partial<{
-    method: "GET" | "POST" | "PUT" | "DELETE";
+    method: "GET" | "POST" | "PUT" | "DELETE" | "HEAD" | "OPTIONS";
     headers: OutgoingHttpHeaders;
     parameters: object;
     query: object;
