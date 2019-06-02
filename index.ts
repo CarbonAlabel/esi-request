@@ -43,7 +43,7 @@ class ESIConnection implements ESIConnectionWrapper {
                 multiplier = Math.min(max_multiplier, multiplier * 2);
             }
         },
-        max_pending_time = 30000
+        max_pending_time = 10000
     }: Partial<ESIConnectionSettings> = {}) {
         Object.assign(this, {
             esi_url,
@@ -195,7 +195,7 @@ class ESIRequest {
         pool_size = 1,
         default_headers = {},
         default_query = {},
-        max_time = 30000,
+        max_time = 10000,
         max_retries = 3,
         retry_delay = () => [3000, 10000, 15000],
         page_split_delay = pages => pages * 75 + 2500,
