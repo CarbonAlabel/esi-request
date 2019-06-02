@@ -7,7 +7,9 @@ const {pipeline} = require("stream");
 
 import {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
 
-const timeout = time => new Promise(resolve => setTimeout(resolve, time));
+function timeout(time: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, time));
+}
 
 // Returns a generator function implementing a form of exponential backoff.
 function exponential_backoff(base_delay: number, max_multiplier: number, multiplier_growth: number = 2) {
