@@ -464,7 +464,7 @@ class ESIRequest {
     }
 
     get close() {
-        return () => {this.connection.close()};
+        return () => this.connection.close();
     }
 }
 
