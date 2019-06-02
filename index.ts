@@ -379,12 +379,16 @@ class ESIRequest {
         if (previous_response) {
             previous_responses = previous_response.responses || [previous_response];
         }
+
+        // Request the first page.
         let first_page = await this._retry_request(path, {...options, previous_response: previous_responses[0]});
         let pages = Number(first_page.headers["x-pages"]) || 1;
-        // Page split prevention:
-        // If there are multiple pages, and the cache for the endpoint will expire soon, wait for it to expire and repeat the request.
-        // This measure, while significantly decreasing it, does not completely eliminate the possibility of a page split occurring.
+
+        // If there are multiple pages, keep going.
         if (pages > 1) {
+            // Page split prevention:
+            // If the cache for the endpoint will expire soon, wait for it to expire and repeat the request.
+            // This measure, while significantly decreasing it, does not completely eliminate the possibility of a page split occurring.
             let expires_in = Date.parse(first_page.headers["expires"]) - Date.parse(first_page.headers["date"]) + 1000;
             let calculated_delay = this.page_split_delay(pages);
             if (expires_in < calculated_delay) {
@@ -392,9 +396,8 @@ class ESIRequest {
                 first_page = await this._retry_request(path, {...options, previous_response: previous_responses[0]});
                 pages = Number(first_page.headers["x-pages"]) || 1;
             }
-        }
-        // Request additional pages, if there are any.
-        if (pages > 1) {
+
+            // Request additional pages.
             let page_numbers = new Array(pages - 1).fill(undefined).map((_, i) => i + 2);
             let other_pages = await Promise.all(page_numbers.map(page => this._retry_request(path, {
                 ...options,
@@ -403,16 +406,20 @@ class ESIRequest {
             })));
             let responses = [first_page, ...other_pages];
             let headers = ESIRequest.common_headers(responses);
+
             // The expires header not being in the common headers is indication of a page split, an error should be thrown.
             if (!headers["expires"]) {
                 let error: any = new Error("Page split detected");
                 error.responses = responses;
                 throw error;
             }
+
+            // Combine the responses and return them.
             let status = first_page.status;
             let data = responses.map(response => response.data).flat();
             return {status, headers, data, responses};
         } else {
+            // There is only one page, return it.
             return first_page;
         }
     }
