@@ -23,6 +23,35 @@ function exponential_backoff(base_delay: number, max_multiplier: number, multipl
     };
 }
 
+// Custom error class with utility functions.
+class ESIError extends Error {
+    response?: ESIResponse;
+
+    constructor(message: string, response?: ESIResponse) {
+        super(message);
+        this.response = response;
+        Error.captureStackTrace(this, ESIError);
+    }
+
+    // Attach a response object to an existing error.
+    static from(error: Error, response: ESIResponse): ESIError {
+        error["response"] = response;
+        return error;
+    }
+
+    // Generate an error based on a response object. 
+    static fromResponse(response: ESIResponse) {
+        let message: string;
+        if (response.data && response.data.error) {
+            message = response.data.error;
+        } else {
+            message = "Response code " + response.status;
+        }
+        return new ESIError(message, response);
+    }
+}
+ESIError.prototype.name = "ESIError";
+
 interface ESIConnectionWrapper {
     request(headers: OutgoingHttpHeaders): ClientHttp2Stream | Promise<ClientHttp2Stream>;
     close(): void;
@@ -246,7 +275,7 @@ class ESIRequest {
             if (name in parameters) {
                 request_path = request_path.replace(token, parameters[name]);
             } else {
-                throw new Error(`Value for URL parameter "${name}" was not provided`);
+                throw new ESIError(`Value for URL parameter "${name}" was not provided`);
             }
         }
         let query_string = new URLSearchParams({
@@ -320,8 +349,7 @@ class ESIRequest {
                     return {status, headers: response_headers, data};
                 }
                 catch (error) {
-                    error.response = {status, headers: response_headers, body: response_body};
-                    throw error;
+                    throw ESIError.from(error, {status, headers: response_headers, body: response_body});
                 }
             } else {
                 return {status, headers: response_headers, body: response_body};
@@ -338,11 +366,10 @@ class ESIRequest {
     private async _retry_request(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let attempts = this.max_retries + 1, time_limit = Date.now() + this.max_time;
         let delay_iterator = this.retry_delay()[Symbol.iterator]();
-        let responses = [];
+        let response: ESIResponse;
         while (attempts > 0 && time_limit > Date.now()) {
-            let response = await this._make_request(path, options);
+            response = await this._make_request(path, options);
             let {status} = response;
-            responses.push(response);
             attempts--;
             if (status >= 200 && status <= 299) {
                 // 2xx class codes indicate success.
@@ -358,10 +385,10 @@ class ESIRequest {
             } else {
                 // All other status codes are assumed to be unrecoverable errors.
                 // If an error message isn't available from the JSON response, use the status code as one.
-                throw Object.assign(new Error(response.data && response.data.error || status), {responses});
+                throw ESIError.fromResponse(response);
             }
         }
-        throw Object.assign(new Error("Retry limit reached"), {responses});
+        throw new ESIError("Retry limit reached", response);
     }
 
     // Finds the common headers from an array of response objects.
@@ -417,9 +444,7 @@ class ESIRequest {
 
             // The expires header not being in the common headers is indication of a page split, an error should be thrown.
             if (!headers["expires"]) {
-                let error: any = new Error("Page split detected");
-                error.responses = responses;
-                throw error;
+                throw new ESIError("Page split detected");
             }
 
             // Combine the responses and return them.
