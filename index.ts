@@ -449,7 +449,7 @@ class ESIRequest {
 
             // Combine the responses and return them.
             let status = first_page.status;
-            let data = responses.map(response => response.data).flat();
+            let data = responses.flatMap(response => response.data);
             return {status, headers, data, responses};
         } else {
             // There is only one page, return it.
@@ -468,7 +468,7 @@ class ESIRequest {
         let responses = await Promise.all(body_chunks.map(body_chunk => this._retry_request(path, {...options, body: body_chunk})));
         let headers = ESIRequest.common_headers(responses);
         let status = responses[0].status;
-        let data = responses.map(response => response.data).flat();
+        let data = responses.flatMap(response => response.data);
         return {status, headers, data, responses};
     }
 
