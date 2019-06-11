@@ -126,7 +126,7 @@ class ESIConnection implements ESIConnectionWrapper {
             // Stop trying to reconnect if the session was explicity closed. 
             if (this.closed) return;
             try {
-                let session = new http2.connect(this.esi_url, this.http2_options);
+                let session = http2.connect(this.esi_url, this.http2_options);
                 // Will throw if an error occurs before the connection is established.
                 await once(session, "connect");
                 // Register event listeners, and start using the session.
