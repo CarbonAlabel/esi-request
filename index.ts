@@ -376,12 +376,26 @@ class ESIRequest {
                 return response;
             } else if (status >= 502 && status <= 504) {
                 // Codes 502, 503, and 504 indicate temporary errors, the request should be retried after a while.
-                let delay = delay_iterator.next();
-                if (delay.value && delay.value < time_limit - Date.now()) {
-                    await timeout(delay.value);
-                } else {
+                let delay: number;
+                // If present, parse the Retry-After header.
+                if (response.headers["retry-after"]) {
+                    let seconds = Number(response.headers["retry-after"]);
+                    if (Number.isInteger(seconds)) {
+                        delay = seconds * 1000;
+                    } else {
+                        delay = Date.parse(response.headers["retry-after"]) - Date.parse(response.headers["date"]) + 1000;
+                    }
+                }
+                // If the Retry-After header wasn't present or was invalid, use the delay generators.
+                if (!delay || delay < 0) {
+                    delay = delay_iterator.next().value;
+                }
+                // If the calculated delay would exceed the time limit, stop immediately.
+                if (delay > time_limit - Date.now()) {
                     break;
                 }
+                // Wait before retrying the request.
+                await timeout(delay);
             } else {
                 // All other status codes are assumed to be unrecoverable errors.
                 // If an error message isn't available from the JSON response, use the status code as one.
