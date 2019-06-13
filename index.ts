@@ -39,9 +39,10 @@ class ESIError extends Error {
         return error;
     }
 
-    // Generate an error based on a response object. 
+    // Generate an error based on a response object.
     static fromResponse(response: ESIResponse) {
         let message: string;
+        // If an error message isn't available from the JSON response, use the status code as one.
         if (response.data && response.data.error) {
             message = response.data.error;
         } else {
@@ -398,7 +399,6 @@ class ESIRequest {
                 await timeout(delay);
             } else {
                 // All other status codes are assumed to be unrecoverable errors.
-                // If an error message isn't available from the JSON response, use the status code as one.
                 throw ESIError.fromResponse(response);
             }
         }
