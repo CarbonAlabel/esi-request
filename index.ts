@@ -216,7 +216,7 @@ type ESIRequestSettings = {
     connection: ESIConnectionWrapper;
     connection_settings: Partial<ESIConnectionSettings>;
     pool_size: number;
-} & Pick<ESIRequest, "default_headers" | "default_query" | "max_time" | "max_retries" | "retry_delay" | "page_split_delay" | "strip_headers">;
+} & Pick<ESIRequest, "default_headers" | "default_query" | "max_time" | "max_retries" | "retry_delay_low" | "retry_delay_high" | "page_split_delay" | "strip_headers">;
 
 class ESIRequest {
     connection: ESIConnectionWrapper;
@@ -224,7 +224,8 @@ class ESIRequest {
     default_query: object;
     max_time: number;
     max_retries: number;
-    retry_delay: () => Iterable<number>;
+    retry_delay_low: () => Iterable<number>;
+    retry_delay_high: () => Iterable<number>;
     page_split_delay: (pages: number) => number;
     strip_headers: string[];
     constructor({
@@ -235,7 +236,8 @@ class ESIRequest {
         default_query = {},
         max_time = 10000,
         max_retries = 3,
-        retry_delay = exponential_backoff(500, 30, 3),
+        retry_delay_low = exponential_backoff(500, 30, 3),
+        retry_delay_high = exponential_backoff(15000, 4),
         page_split_delay = pages => pages * 75 + 2500,
         strip_headers = [
             "access-control-allow-credentials",
@@ -260,7 +262,8 @@ class ESIRequest {
             default_query,
             max_time,
             max_retries,
-            retry_delay,
+            retry_delay_low,
+            retry_delay_high,
             page_split_delay,
             strip_headers
         });
@@ -366,7 +369,8 @@ class ESIRequest {
     // Make a request, retrying if an error likely to be temporary occurs.
     private async _retry_request(path: string, options: ESIRequestOptions): Promise<ESIResponse> {
         let attempts = this.max_retries + 1, time_limit = Date.now() + this.max_time;
-        let delay_iterator = this.retry_delay()[Symbol.iterator]();
+        let delay_iterator_low = this.retry_delay_low()[Symbol.iterator]();
+        let delay_iterator_high = this.retry_delay_high()[Symbol.iterator]();
         let response: ESIResponse;
         while (attempts > 0 && time_limit > Date.now()) {
             response = await this._make_request(path, options);
@@ -389,7 +393,13 @@ class ESIRequest {
                 }
                 // If the Retry-After header wasn't present or was invalid, use the delay generators.
                 if (!delay || delay < 0) {
-                    delay = delay_iterator.next().value;
+                    // Errors returned by ESI count against the error limit, and are usually caused by longer-lasting events.
+                    // A higher delay time should be used.
+                    if ("x-esi-error-limit-reset" in response.headers) {
+                        delay = delay_iterator_high.next().value;
+                    } else {
+                        delay = delay_iterator_low.next().value;
+                    }
                 }
                 // If the calculated delay would exceed the time limit, stop immediately.
                 if (delay > time_limit - Date.now()) {
