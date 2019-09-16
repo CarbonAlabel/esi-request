@@ -9,13 +9,13 @@ let ESI = new ESIRequest({
 
 (async () => {
     // Request the list of region IDs.
-    let regions = await ESI.request("/v1/universe/regions/");
+    let regions = await ESI.request("/v1/universe/regions/").data;
     // Request the market orders for each of the regions.
     console.time("markets");
-    let markets = await Promise.all(regions.data.map(region_id => ESI.request("/v1/markets/{region_id}/orders/", {parameters: {region_id}})));
+    let markets = await Promise.all(regions.map(region_id => ESI.request("/v1/markets/{region_id}/orders/", {parameters: {region_id}}).data));
     console.timeEnd("markets");
     // Merge all the orders into a single array.
-    let market_orders = markets.map(response => response.data).flat();
+    let market_orders = markets.flat();
     // Just return how many of them there are in total.
     return market_orders.length;
 })().then(console.log, console.error).finally(ESI.close);
