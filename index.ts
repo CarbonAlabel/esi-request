@@ -212,6 +212,20 @@ type ESIResponse = {
     responses?: ESIResponse[];
 }
 
+type ESIResponsePromise = Promise<ESIResponse> & {
+    data: Promise<any>
+};
+
+// Add utility getters to an ESIResponse promise, making direct access to the response data easier.
+function addUtilityGetters(response: Promise<ESIResponse>): ESIResponsePromise {
+    return Object.defineProperties(response, {
+        data: {get: getData}
+    });
+}
+function getData(): Promise<any> {
+    return this.then((r: ESIResponse) => r.data);
+}
+
 type ESIRequestSettings = {
     connection: ESIConnectionWrapper;
     connection_settings: Partial<ESIConnectionSettings>;
@@ -496,20 +510,23 @@ class ESIRequest {
         return {status, headers, data, responses};
     }
 
-    request(path: string, options: ESIRequestOptions = {}): Promise<ESIResponse> {
+    request(path: string, options: ESIRequestOptions = {}): ESIResponsePromise {
+        let response: Promise<ESIResponse>;
         let {method, body, body_page_size} = options;
         // By default, perform a GET request with pagination.
         if ((method || "GET") === "GET") {
-            return this._paginate_get(path, options);
+            response = this._paginate_get(path, options);
         }
         // If the parameters required for a paginated POST request are present, do that instead.
         else if (method === "POST" && Number.isInteger(body_page_size) && Array.isArray(body)) {
-            return this._paginate_post(path, options);
+            response = this._paginate_post(path, options);
         }
         // Otherwise, perform a single request.
         else {
-            return this._retry_request(path, options);
+            response = this._retry_request(path, options);
         }
+        // Return the response promise with utility getters.
+        return addUtilityGetters(response);
     }
 
     get close() {
