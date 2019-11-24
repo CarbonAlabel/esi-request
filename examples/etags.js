@@ -1,4 +1,4 @@
-const ESIRequest = require("../index.js");
+import {ESIRequest} from "../index.js";
 
 let ESI = new ESIRequest();
 

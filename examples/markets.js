@@ -1,4 +1,4 @@
-const ESIRequest = require("../index.js");
+import {ESIRequest} from "../index.js";
 
 // Getting all the market orders from ESI is a big task, and as done below, will involve making hundreds of concurrent requests to ESI.
 // With the default settings, this might take a while, as a single connection can only handle 128 concurrent requests.

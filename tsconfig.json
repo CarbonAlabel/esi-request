@@ -5,7 +5,7 @@
             "esnext",
             "dom"
         ],
-        "module": "commonjs",
+        "module": "es6",
         "declaration": true,
         "sourceMap": true,
         "removeComments": true,

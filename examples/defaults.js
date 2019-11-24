@@ -1,4 +1,4 @@
-const ESIRequest = require("../index.js");
+import {ESIRequest} from "../index.js";
 
 // This ESI instance will by default target Singularity (the test server), and request German-localized strings be returned where supported.
 let ESI = new ESIRequest({

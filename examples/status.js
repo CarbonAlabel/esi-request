@@ -1,4 +1,4 @@
-const ESIRequest = require("../index.js");
+import {ESIRequest} from "../index.js";
 
 // This ESI instance will keep retrying the request every 10 seconds, until the request succeeds.
 let ESI = new ESIRequest({

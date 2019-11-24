@@ -1,11 +1,7 @@
-"use strict";
-
-const http2 = require("http2");
-const zlib = require("zlib");
-const {once} = require("events");
-const {pipeline} = require("stream");
-
-import {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
+import {once} from "events";
+import {pipeline} from "stream";
+import {createGunzip, createInflate, createBrotliDecompress} from "zlib";
+import {connect as http2Connect, ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
 
 function timeout(time: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, time));
@@ -127,7 +123,7 @@ class ESIConnection implements ESIConnectionWrapper {
             // Stop trying to reconnect if the session was explicity closed. 
             if (this.closed) return;
             try {
-                let session = http2.connect(this.esi_url, this.http2_options);
+                let session = http2Connect(this.esi_url, this.http2_options);
                 // Will throw if an error occurs before the connection is established.
                 await once(session, "connect");
                 // Register event listeners, and start using the session.
@@ -344,9 +340,9 @@ class ESIRequest {
         let stream = request;
         if (["gzip", "deflate", "br"].includes(response_headers["content-encoding"])) {
             let decompress = {
-                "gzip": zlib.createGunzip,
-                "deflate": zlib.createInflate,
-                "br": zlib.createBrotliDecompress
+                "gzip": createGunzip,
+                "deflate": createInflate,
+                "br": createBrotliDecompress
             }[response_headers["content-encoding"]]();
             stream = decompress;
             pipeline(request, decompress, () => {});
@@ -534,4 +530,4 @@ class ESIRequest {
     }
 }
 
-export = ESIRequest;
+export {ESIRequest};

@@ -2,6 +2,7 @@
   "name": "esi-request",
   "version": "0.1.0",
   "description": "Zero dependency Node.js library for making requests to EVE Online's ESI API.",
+  "type": "module",
   "main": "index.js",
   "types": "index.d.ts",
   "repository": "github:CarbonAlabel/esi-request",
