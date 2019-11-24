@@ -17,13 +17,13 @@
   },
   "homepage": "https://github.com/CarbonAlabel/esi-request#readme",
   "engines": {
-    "node": ">=11.14.0"
+    "node": ">=13.2.0"
   },
   "files": [
     "index.*"
   ],
   "devDependencies": {
-    "@types/node": "^12.0.0",
-    "typescript": "^3.4.5"
+    "@types/node": "^12.12.12",
+    "typescript": "^3.7.2"
   }
 }
