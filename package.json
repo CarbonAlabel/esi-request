@@ -1,6 +1,6 @@
 {
   "name": "esi-request",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Zero dependency Node.js library for making requests to EVE Online's ESI API.",
   "main": "index.js",
   "types": "index.d.ts",
