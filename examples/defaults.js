@@ -1,10 +1,7 @@
 import {ESIRequest} from "../index.js";
 
-// This ESI instance will by default target Singularity (the test server), and request German-localized strings be returned where supported.
+// This ESI instance will request German-localized strings.
 let ESI = new ESIRequest({
-    default_query: {
-        "datasource": "singularity"
-    },
     default_headers: {
         "accept-language": "de"
     }
