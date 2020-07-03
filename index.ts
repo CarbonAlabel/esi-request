@@ -2,7 +2,7 @@ import {once} from "events";
 import {pipeline} from "stream";
 import {createGunzip, createInflate, createBrotliDecompress} from "zlib";
 import {connect as http2Connect} from "http2";
-import type {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2"; 
+import type {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
 
 function timeout(time: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, time));
@@ -229,7 +229,7 @@ type ESIRequestSettings = {
     pool_size: number;
 } & Pick<ESIRequest, "default_headers" | "default_query" | "max_time" | "max_retries" | "retry_delay_low" | "retry_delay_high" | "page_split_delay" | "strip_headers">;
 
-class ESIRequest {
+export class ESIRequest {
     connection: ESIConnectionWrapper;
     default_headers: object;
     default_query: object;
@@ -530,5 +530,3 @@ class ESIRequest {
         return () => this.connection.close();
     }
 }
-
-export {ESIRequest};
