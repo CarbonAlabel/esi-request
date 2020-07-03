@@ -120,7 +120,7 @@ class ESIConnection implements ESIConnectionWrapper {
     private async reconnect() {
         let delay_iterator = this.reconnect_delay()[Symbol.iterator]();
         while (true) {
-            // Stop trying to reconnect if the session was explicity closed. 
+            // Stop trying to reconnect if the session was explicitly closed. 
             if (this.closed) return;
             try {
                 let session = http2Connect(this.esi_url, this.http2_options);
