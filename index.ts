@@ -1,7 +1,8 @@
 import {once} from "events";
 import {pipeline} from "stream";
 import {createGunzip, createInflate, createBrotliDecompress} from "zlib";
-import {connect as http2Connect, ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2";
+import {connect as http2Connect} from "http2";
+import type {ClientHttp2Session, ClientHttp2Stream, IncomingHttpHeaders, OutgoingHttpHeaders, SecureClientSessionOptions} from "http2"; 
 
 function timeout(time: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, time));
