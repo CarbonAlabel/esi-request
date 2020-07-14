@@ -15,12 +15,14 @@ Zero-dependency Node.js library for making requests to EVE Online's ESI API.
 
 ## Usage
 
-Node.js 11.14.0 or newer is required. Import the class, and create a new instance of it.
+Node.js 13.2.0 or newer is required. Import the class, and create a new instance of it.
 
 ```js
-const ESIRequest = require("esi-request");
-let ESI = new ESIRequest();
+import {ESIRequest} from "esi-request";
+const ESI = new ESIRequest();
 ```
+
+**The documentation below may be slightly out of date**
 
 Optionally, an options object can be passed to the constructor. Available options are:
 
@@ -36,8 +38,8 @@ Optionally, an options object can be passed to the constructor. Available option
 Once the instance is ready, use the `request` method, preferably in an async context, to make requests to ESI.
 
 ```js
-let status = await ESI.request("/v1/status/");
-console.log(`There are currently ${status.data.players} players online.`);
+let status = await ESI.request("/v1/status/").data;
+console.log(`There are currently ${status.players} players online.`);
 ```
 
 In addition to the request path, an options object can be passed. Available options are:
