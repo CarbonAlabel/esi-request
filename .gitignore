@@ -5,5 +5,6 @@ node_modules/
 *.tsbuildinfo
 
 # Compiled files
-index.*
-!index.ts
+*.js
+*.d.ts
+*.js.map
